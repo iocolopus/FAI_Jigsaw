@@ -1,0 +1,2 @@
+https://github.com/whitcrrd/puzzle-image-segmentation/blob/master/puzzle-segmentation.ipynb
+https://medium.com/data-science/solving-jigsaw-puzzles-with-python-and-opencv-d775ba730660E
