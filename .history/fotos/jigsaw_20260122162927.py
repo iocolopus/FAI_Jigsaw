@@ -1,0 +1,4 @@
+print('chocho')
+
+
+print("c")
