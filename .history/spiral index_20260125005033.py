@@ -1,0 +1,1 @@
+def spiral_index

@@ -258,8 +258,6 @@ class  Backtrack_solver():
         self.pieces = pieces
 
     def solve(self):
-
-
         def spiral_index(n, m):
             """Genera una lista de indices de una matriz n x m en orden espiral."""
             result = []
@@ -287,7 +285,6 @@ class  Backtrack_solver():
             return result
 
         spiral_index = spiral_index(5, 5)
-        
         distancias = np.zeros((len(self.pieces)*4, len(self.pieces)*4))
 
 

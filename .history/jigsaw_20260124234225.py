@@ -65,15 +65,17 @@ class Piece:
         plt.show()
 
 
+
+    
+
 class Edge():
 
     def __init__(self, contour, pieza):
         self.contour = contour
         self.pieza = pieza
-        self.kind = self.clasify_kind()  
 
-
-    def clasify_kind(self):
+    @property
+    def kind(self):
         """Clasificamos cada tipo de arista segun sin es entrante o saliente, de modo que solo medimos la similaridad entre aristas de distinto tipo puesto que son las que en cualquier caso encajarian."""
 
         # 0 plano 1 macho 2 hembra
@@ -118,23 +120,30 @@ class Edge():
 
         direction = c2 - c1
         angle = np.arctan2(direction[1], direction[0])
-        # Prueba rara
-
-        kind = self.kind
-
-        if kind == 'hembra':
-            R = np.array([[np.cos(np.pi - angle), -np.sin(np.pi - angle)],
-                          [np.sin(np.pi - angle),  np.cos(np.pi - angle)]])
-            
-            rotated = np.dot(self.contour - c2, R.T)
-        else:
-            R = np.array([[np.cos(-angle), -np.sin(-angle)],
-                          [np.sin(-angle),  np.cos(-angle)]])
+        R = np.array([[np.cos(-angle), -np.sin(-angle)],
+                      [np.sin(-angle),  np.cos(-angle)]])
         
-            rotated = np.dot(self.contour - c1, R.T)
-            rotated = rotated[::-1]
+        rotated = np.dot(self.contour - c1, R.T)
         
-
+        tipo = self.kind
+        
+        # con la rotación que habíamos aplicado, se hacía como un flip horizontal
+        # y quedaba al revés, con esto simplemente lo corregimos para cada caso para que quede
+        # todo hacia arriba
+        if tipo == "macho" or tipo == "plano":
+            rotated[:, 0] = -rotated[:, 0] + np.linalg.norm(direction)
+        elif tipo == "hembra":
+            rotated[:, 1] = -rotated[:, 1]
+        
+        rotated[:,1] += 100
+        
+        plt.plot(rotated[:, 0], rotated[:, 1])
+        plt.plot(rotated[0, 0], rotated[0, 1], 'ro')
+        plt.plot(rotated[-1, 0], rotated[-1, 1], 'go')
+        
+        plt.xlim(-10,280)
+        plt.ylim(0,200)
+        plt.show()
         return rotated
 
 
@@ -145,7 +154,38 @@ class Edge():
         c2 = self.contour[-1]
         return np.linalg.norm(c2 - c1)
     
+    def straighten_contour_normalized(self, show=False):
+        """
+        Devuelve el contorno enderezado con el primer punto en (0, 0).
+        No escala nada - mantiene las dimensiones reales.
+        """
+        c1 = self.contour[0]
+        c2 = self.contour[-1]
 
+        direction = c2 - c1
+        angle = np.arctan2(direction[1], direction[0])
+        R = np.array([[np.cos(-angle), -np.sin(-angle)],
+                      [np.sin(-angle),  np.cos(-angle)]])
+        
+        rotated = np.dot(self.contour - c1, R.T)
+        
+        tipo = self.kind
+        
+        # Corregimos orientación según tipo
+        if tipo == "macho" or tipo == "plano":
+            rotated[:, 0] = -rotated[:, 0] + np.linalg.norm(direction)
+        elif tipo == "hembra":
+            rotated[:, 1] = -rotated[:, 1]
+        
+        if show:
+            plt.plot(rotated[:, 0], rotated[:, 1])
+            plt.plot(rotated[0, 0], rotated[0, 1], 'ro', label='inicio')
+            plt.plot(rotated[-1, 0], rotated[-1, 1], 'go', label='fin')
+            plt.axis('equal')
+            plt.legend()
+            plt.show()
+            
+        return rotated
     
     def abs_len_diff(self, other):
         return abs(self.length - other.length)
@@ -160,7 +200,7 @@ class Edge():
         Returns:
             Tuple de (x_resampled, y_resampled) con n_samples puntos cada uno, uniformemente distribuidos en longitud de arco.
         """
-        contour = self.straighten_contour.astype(np.float32)
+        contour = self.contour.astype(float)
         
         # Calcular longitudes de arco acumuladas
         diffs = np.diff(contour, axis=0)
@@ -192,32 +232,25 @@ class Edge():
         
         return x_resampled, y_resampled
     
-    def dissimilarity(self, other : Piece, c1 = 0, n_samples=50, plot=False):
-        # c1: regula la importancia que se le da en la disimilaridad la diferencia de longitudes entre aristas
+    def dissimilarity(self, other, plot=False):
         """
         Calcula una medida de disimilitud entre esta arista y otra.
         Utiliza remuestreo uniforme y suma de diferencias cuadráticas.
         
         Args:
             other: Otra instancia de Edge para comparar.
-            c1: Coeficiente que regula la importancia de la diferencia de longitudes entre aristas.
+            show: Si es True, muestra los contornos remuestreados.
             
         Returns:
             Valor numérico que representa la disimilitud entre las dos aristas.
         """
-
-        if self.kind in [other.kind or 'plano']:
-            return np.inf
+        n_samples = 50
         
-        x1, y1 = self.resample_contour_uniform(n_samples=n_samples)
-        x2, y2 = other.resample_contour_uniform(n_samples=n_samples)
+        x1, y1 = self.resample_contour_uniform(n_samples=n_samples, plot=plt.show)
+        x2, y2 = other.resample_contour_uniform(n_samples=n_samples, plot=plt.show)
         
         # Calcular disimilitud como suma de diferencias cuadráticas
-        mean_root_square_error = (np.sum((x1 - x2) ** 2 + (y1 - y2) ** 2) / n_samples) ** 0.5
-        length_difference = self.abs_len_diff(other)
-
-        dissimilarity_value = mean_root_square_error + c1 * length_difference
-
+        dissimilarity_value = np.sum((x1 - x2) ** 2 + (y1 - y2) ** 2)
 
         if plot:
             plt.plot(x1, y1, 'o-', label='Arista 1')
@@ -225,14 +258,6 @@ class Edge():
             plt.title(f'Dissimilarity: {dissimilarity_value:.2f}')
             plt.axis('equal')
             plt.legend()
-            plt.show()
-
-        # ploteamos un segmenteo de recta entre cada par de puntos para ver mejor la diferencia
-        if plot:
-            for i in range(n_samples):
-                plt.plot([x1[i], x2[i]], [y1[i], y2[i]], 'r-')
-            plt.title('Diferencias entre puntos remuestreados')
-            plt.axis('equal')
             plt.show()
         
         return dissimilarity_value
@@ -253,48 +278,12 @@ class Edge():
         pass
         
 
-class  Backtrack_solver():
-    def __init__(self, pieces = [Piece]):
-        self.pieces = pieces
-
-    def solve(self):
+    
 
 
-        def spiral_index(n, m):
-            """Genera una lista de indices de una matriz n x m en orden espiral."""
-            result = []
-            top, bottom, left, right = 0, n - 1, 0, m - 1
-
-            while top <= bottom and left <= right:
-                for j in range(left, right + 1):
-                    result.append((top, j))
-                top += 1
-
-                for i in range(top, bottom + 1):
-                    result.append((i, right))
-                right -= 1
-
-                if top <= bottom:
-                    for j in range(right, left - 1, -1):
-                        result.append((bottom, j))
-                    bottom -= 1
-
-                if left <= right:
-                    for i in range(bottom, top - 1, -1):
-                        result.append((i, left))
-                    left += 1
-
-            return result
-
-        spiral_index = spiral_index(5, 5)
-        
-        distancias = np.zeros((len(self.pieces)*4, len(self.pieces)*4))
-
-
-        def r_solve(current_solution):
-            pass
-        
-
+class solver:
+    def __init__(self):
+        pass
 
 
 

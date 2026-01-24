@@ -65,15 +65,17 @@ class Piece:
         plt.show()
 
 
+
+    
+
 class Edge():
 
     def __init__(self, contour, pieza):
         self.contour = contour
         self.pieza = pieza
-        self.kind = self.clasify_kind()  
 
-
-    def clasify_kind(self):
+    @property
+    def kind(self):
         """Clasificamos cada tipo de arista segun sin es entrante o saliente, de modo que solo medimos la similaridad entre aristas de distinto tipo puesto que son las que en cualquier caso encajarian."""
 
         # 0 plano 1 macho 2 hembra
@@ -132,7 +134,8 @@ class Edge():
                           [np.sin(-angle),  np.cos(-angle)]])
         
             rotated = np.dot(self.contour - c1, R.T)
-            rotated = rotated[::-1]
+            # Invertir el orden en el que se recorren los puntos para que siempre vaya de izquierda a derecha
+            rotated = rotated[]
         
 
         return rotated
@@ -192,32 +195,25 @@ class Edge():
         
         return x_resampled, y_resampled
     
-    def dissimilarity(self, other : Piece, c1 = 0, n_samples=50, plot=False):
-        # c1: regula la importancia que se le da en la disimilaridad la diferencia de longitudes entre aristas
+    def dissimilarity(self, other, plot=False):
         """
         Calcula una medida de disimilitud entre esta arista y otra.
         Utiliza remuestreo uniforme y suma de diferencias cuadráticas.
         
         Args:
             other: Otra instancia de Edge para comparar.
-            c1: Coeficiente que regula la importancia de la diferencia de longitudes entre aristas.
+            show: Si es True, muestra los contornos remuestreados.
             
         Returns:
             Valor numérico que representa la disimilitud entre las dos aristas.
         """
-
-        if self.kind in [other.kind or 'plano']:
-            return np.inf
+        n_samples = 50
         
         x1, y1 = self.resample_contour_uniform(n_samples=n_samples)
         x2, y2 = other.resample_contour_uniform(n_samples=n_samples)
         
         # Calcular disimilitud como suma de diferencias cuadráticas
-        mean_root_square_error = (np.sum((x1 - x2) ** 2 + (y1 - y2) ** 2) / n_samples) ** 0.5
-        length_difference = self.abs_len_diff(other)
-
-        dissimilarity_value = mean_root_square_error + c1 * length_difference
-
+        dissimilarity_value = np.sum((x1 - x2) ** 2 + (y1 - y2) ** 2)
 
         if plot:
             plt.plot(x1, y1, 'o-', label='Arista 1')
@@ -253,48 +249,12 @@ class Edge():
         pass
         
 
-class  Backtrack_solver():
-    def __init__(self, pieces = [Piece]):
-        self.pieces = pieces
-
-    def solve(self):
+    
 
 
-        def spiral_index(n, m):
-            """Genera una lista de indices de una matriz n x m en orden espiral."""
-            result = []
-            top, bottom, left, right = 0, n - 1, 0, m - 1
-
-            while top <= bottom and left <= right:
-                for j in range(left, right + 1):
-                    result.append((top, j))
-                top += 1
-
-                for i in range(top, bottom + 1):
-                    result.append((i, right))
-                right -= 1
-
-                if top <= bottom:
-                    for j in range(right, left - 1, -1):
-                        result.append((bottom, j))
-                    bottom -= 1
-
-                if left <= right:
-                    for i in range(bottom, top - 1, -1):
-                        result.append((i, left))
-                    left += 1
-
-            return result
-
-        spiral_index = spiral_index(5, 5)
-        
-        distancias = np.zeros((len(self.pieces)*4, len(self.pieces)*4))
-
-
-        def r_solve(current_solution):
-            pass
-        
-
+class solver:
+    def __init__(self):
+        pass
 
 
 
