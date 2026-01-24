@@ -31,7 +31,7 @@ class Piece:
 
 
     def generate_edges(self):
-        # Genera los objetos aristas la arista 0 er arriba y continua aumentando en el sentido de las aguas del reloj.
+        # Genera los objetos aristas la arista 0 er arriba 
 
         edges = []
 
@@ -73,10 +73,7 @@ class Edge():
         self.contour = contour
         self.pieza = pieza
 
-    @property
     def kind(self):
-        """Clasificamos cada tipo de arista segun sin es entrante o saliente, de modo que solo medimos la similaridad entre aristas de distinto tipo puesto que son las que en cualquier caso encajarian."""
-
         # 0 plano 1 macho 2 hembra
         
         c1 = self.contour[0]
@@ -109,10 +106,7 @@ class Edge():
         else:
             return 'macho'
 
-    @property
     def straighten_contour(self):
-        """Hacemos que el contorno este recto para poder hacer las comparaciones entre aristas independientemente de como estuviera cada arista orientada en la foto."""
-
         # sea todas pa arriba
         c1 = self.contour[0]
         c2 = self.contour[-1]
@@ -124,7 +118,7 @@ class Edge():
         
         rotated = np.dot(self.contour - c1, R.T)
         
-        tipo = self.kind
+        tipo = self.kind()
         
         # con la rotación que habíamos aplicado, se hacía como un flip horizontal
         # y quedaba al revés, con esto simplemente lo corregimos para cada caso para que quede
@@ -145,50 +139,36 @@ class Edge():
         plt.show()
         return rotated
 
-
-    @property
-    def length(self):
-        """Longitud de la arista (distancia euclidiana entre extremos)."""
-        c1 = self.contour[0]
-        c2 = self.contour[-1]
-        return np.linalg.norm(c2 - c1)
-    
-    def straighten_contour_normalized(self, show=False):
-        """
-        Devuelve el contorno enderezado con el primer punto en (0, 0).
-        No escala nada - mantiene las dimensiones reales.
-        """
-        c1 = self.contour[0]
-        c2 = self.contour[-1]
-
-        direction = c2 - c1
-        angle = np.arctan2(direction[1], direction[0])
-        R = np.array([[np.cos(-angle), -np.sin(-angle)],
-                      [np.sin(-angle),  np.cos(-angle)]])
+    def masked_contour(self):
+        mask = np.zeros((200, 280), dtype=np.uint8)
+        straightened = self.straighten_contour()
+        tipo = self.kind()
+        c1, c2 = straightened[0], straightened[-1]
         
-        rotated = np.dot(self.contour - c1, R.T)
-        
-        tipo = self.kind
-        
-        # Corregimos orientación según tipo
         if tipo == "macho" or tipo == "plano":
-            rotated[:, 0] = -rotated[:, 0] + np.linalg.norm(direction)
-        elif tipo == "hembra":
-            rotated[:, 1] = -rotated[:, 1]
+            # con esto creo 4 puntos más para cerrar el polígono
+            straightened = np.vstack([[280, c1[1]], straightened, [0, c2[1]], [0,0], [280,0]])
+        if tipo == "hembra":
+            # aquí más de lo mismo
+            straightened = np.vstack([[0, c1[1]], straightened, [280, c2[1]], [280,280], [0,280]])
         
-        if show:
-            plt.plot(rotated[:, 0], rotated[:, 1])
-            plt.plot(rotated[0, 0], rotated[0, 1], 'ro', label='inicio')
-            plt.plot(rotated[-1, 0], rotated[-1, 1], 'go', label='fin')
-            plt.axis('equal')
-            plt.legend()
-            plt.show()
-            
-        return rotated
+        cv.fillPoly(mask, [straightened.astype(np.int32)], 255)
+        
+        plt.imshow(mask, cmap='gray', origin='lower')
+        plt.show()
+        
+        return mask
     
-    def dissimilarity(self, other, length_tolerance=10, show=False):
-        pass
-    
+    def xor_masked_contour(self, other):
+        mask1 = self.masked_contour()
+        mask2 = other.masked_contour()
+        
+        xor_mask = cv.bitwise_xor(mask1, mask2)
+        
+        plt.imshow(xor_mask, cmap='gray', origin='lower')
+        plt.show()
+        
+        return xor_mask
         
         
     def plot(self):

@@ -189,6 +189,32 @@ class Edge():
     def dissimilarity(self, other, length_tolerance=10, show=False):
         pass
     
+    def _interpolate_contour(self, contour, n_points):
+        """Interpola el contorno para tener n_points puntos equiespaciados."""
+        # Calcular la longitud acumulada a lo largo del contorno
+        diffs = np.diff(contour, axis=0)
+        segment_lengths = np.sqrt((diffs ** 2).sum(axis=1))
+        cumulative_length = np.concatenate([[0], np.cumsum(segment_lengths)])
+        total_length = cumulative_length[-1]
+        
+        # Crear puntos equiespaciados
+        target_lengths = np.linspace(0, total_length, n_points)
+        
+        # Interpolar x e y
+        x_interp = np.interp(target_lengths, cumulative_length, contour[:, 0])
+        y_interp = np.interp(target_lengths, cumulative_length, contour[:, 1])
+        
+        return np.column_stack([x_interp, y_interp])
+    
+    def _polygon_area(self, vertices):
+        """Calcula el área de un polígono usando la fórmula del shoelace."""
+        n = len(vertices)
+        area = 0.0
+        for i in range(n):
+            j = (i + 1) % n
+            area += vertices[i, 0] * vertices[j, 1]
+            area -= vertices[j, 0] * vertices[i, 1]
+        return abs(area) / 2.0
         
         
     def plot(self):

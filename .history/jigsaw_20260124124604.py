@@ -124,7 +124,7 @@ class Edge():
         
         rotated = np.dot(self.contour - c1, R.T)
         
-        tipo = self.kind
+        tipo = self.kind()
         
         # con la rotación que habíamos aplicado, se hacía como un flip horizontal
         # y quedaba al revés, con esto simplemente lo corregimos para cada caso para que quede
@@ -187,8 +187,111 @@ class Edge():
         return rotated
     
     def dissimilarity(self, other, length_tolerance=10, show=False):
-        pass
+        """
+        Calcula la disimilaridad entre dos aristas para ver si encajan.
+        
+        Solo tiene sentido comparar macho con hembra.
+        
+        Parámetros:
+        - length_tolerance: diferencia máxima de longitud permitida (en píxeles)
+        - show: si True, muestra gráficos de debug
+        
+        Retorna:
+        - float: valor de disimilaridad (menor = mejor encaje)
+        - float('inf') si no pueden encajar (tipos incompatibles o longitudes muy diferentes)
+        """
+        # 1. Verificar compatibilidad de tipos
+        tipo_self = self.kind
+        tipo_other = other.kind
+        
+        # Solo macho-hembra pueden encajar
+        if not ((tipo_self == "macho" and tipo_other == "hembra") or 
+                (tipo_self == "hembra" and tipo_other == "macho")):
+            return float('inf')
+        
+        # 2. Verificar compatibilidad de longitudes (SIN ESCALAR)
+        len_self = self.length
+        len_other = other.length
+        length_diff = abs(len_self - len_other)
+        
+        if length_diff > length_tolerance:
+            if show:
+                print(f"Longitudes incompatibles: {len_self:.1f} vs {len_other:.1f} (diff={length_diff:.1f})")
+            return float('inf')
+        
+        # 3. Obtener contornos enderezados (sin escalar)
+        contour1 = self.straighten_contour_normalized()
+        contour2 = other.straighten_contour_normalized()
+        
+        # 4. Para comparar, necesitamos "voltear" uno de los contornos
+        # porque cuando encajan, uno está espejado respecto al otro
+        # Volteamos horizontalmente el segundo contorno
+        contour2_flipped = contour2.copy()
+        contour2_flipped[:, 0] = contour2[:, 0].max() - contour2_flipped[:, 0]
+        contour2_flipped = contour2_flipped[::-1]  # invertir orden de puntos
+        
+        # 5. Interpolar ambos contornos para tener el mismo número de puntos
+        n_points = 100
+        contour1_interp = self._interpolate_contour(contour1, n_points)
+        contour2_interp = self._interpolate_contour(contour2_flipped, n_points)
+        
+        # 6. Calcular área entre las curvas (disimilaridad)
+        # Usamos la fórmula del área del polígono formado por ambas curvas
+        polygon = np.vstack([contour1_interp, contour2_interp[::-1]])
+        area = self._polygon_area(polygon)
+        
+        # También añadimos penalización por diferencia de longitud
+        dissimilarity = area + length_diff * 2  # penalización proporcional
+        
+        if show:
+            fig, axes = plt.subplots(1, 2, figsize=(12, 5))
+            
+            # Plot de los contornos superpuestos
+            axes[0].plot(contour1_interp[:, 0], contour1_interp[:, 1], 'b-', label=f'self ({tipo_self})')
+            axes[0].plot(contour2_interp[:, 0], contour2_interp[:, 1], 'r-', label=f'other ({tipo_other}) flipped')
+            axes[0].fill_between(contour1_interp[:, 0], contour1_interp[:, 1], contour2_interp[:, 1], alpha=0.3, color='purple')
+            axes[0].set_title(f'Disimilaridad: {dissimilarity:.1f}\nÁrea: {area:.1f}, ΔLongitud: {length_diff:.1f}')
+            axes[0].legend()
+            axes[0].axis('equal')
+            
+            # Plot de los contornos originales
+            axes[1].plot(contour1[:, 0], contour1[:, 1], 'b-', label='self original')
+            axes[1].plot(contour2[:, 0], contour2[:, 1], 'r-', label='other original')
+            axes[1].set_title(f'Longitudes: {len_self:.1f} vs {len_other:.1f}')
+            axes[1].legend()
+            axes[1].axis('equal')
+            
+            plt.tight_layout()
+            plt.show()
+        
+        return dissimilarity
     
+    def _interpolate_contour(self, contour, n_points):
+        """Interpola el contorno para tener n_points puntos equiespaciados."""
+        # Calcular la longitud acumulada a lo largo del contorno
+        diffs = np.diff(contour, axis=0)
+        segment_lengths = np.sqrt((diffs ** 2).sum(axis=1))
+        cumulative_length = np.concatenate([[0], np.cumsum(segment_lengths)])
+        total_length = cumulative_length[-1]
+        
+        # Crear puntos equiespaciados
+        target_lengths = np.linspace(0, total_length, n_points)
+        
+        # Interpolar x e y
+        x_interp = np.interp(target_lengths, cumulative_length, contour[:, 0])
+        y_interp = np.interp(target_lengths, cumulative_length, contour[:, 1])
+        
+        return np.column_stack([x_interp, y_interp])
+    
+    def _polygon_area(self, vertices):
+        """Calcula el área de un polígono usando la fórmula del shoelace."""
+        n = len(vertices)
+        area = 0.0
+        for i in range(n):
+            j = (i + 1) % n
+            area += vertices[i, 0] * vertices[j, 1]
+            area -= vertices[j, 0] * vertices[i, 1]
+        return abs(area) / 2.0
         
         
     def plot(self):
