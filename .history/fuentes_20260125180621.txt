@@ -1,5 +1,3 @@
-Proyectos similares.
-
 https://github.com/whitcrrd/puzzle-image-segmentation/blob/master/puzzle-segmentation.ipynb
 https://medium.com/data-science/solving-jigsaw-puzzles-with-python-and-opencv-d775ba730660E
 
@@ -8,6 +6,5 @@ Dos Robots que hacen puzles.
 https://www.youtube.com/watch?v=Sqr-PdVYhY4
 https://www.youtube.com/watch?v=Sqr-PdVYhY4
 
-Una explicacion academica de puzles de 6 piezas.
 
 https://www.youtube.com/watch?v=Bo0RSxt5ECI

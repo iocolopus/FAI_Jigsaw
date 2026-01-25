@@ -287,8 +287,7 @@ class Backtrack_solver():
     def __init__(self, pieces = [Piece]):
         self.pieces = pieces
 
-    def solve(self, plot_for_ipynb_t_1=False, plot_for_ipynb_t_2=False, plot_for_ipynb_t_3=False, c1=0, n_samples=50, greedy=True, edge_threshold=9, interior_threshold=16):
-
+    def solve(self, plot_for_ipynb_t_1=False, plot_for_ipynb_t_2=False, plot_for_ipynb_t_3=False):
 
 
         def generate_spiral_index(n, m):
@@ -574,7 +573,10 @@ class Backtrack_solver():
                     return np.array([x, y])
 
                 def get_edge_corners(pieza, edge_pos, rotacion, img_shape):
-
+                    """
+                    Obtiene las dos esquinas de una arista en coordenadas de imagen rotada.
+                    Igual que en plot_t_2 porque al flipear FRONT queda como BACK.
+                    """
                     edge_orig = (edge_pos + rotacion) % 4
                     
                     c1_orig = np.array(pieza.corners[(edge_orig + 1) % 4])
@@ -586,18 +588,19 @@ class Backtrack_solver():
                     return c1_rot, c2_rot
 
                 def get_all_corners_rotated(pieza, rotacion, img_shape):
-
+                    """Obtiene las 4 esquinas rotadas de una pieza."""
                     corners_rot = []
                     for corner in pieza.corners:
                         corners_rot.append(rotate_corner(np.array(corner), rotacion, img_shape))
                     return corners_rot
 
-
+                # Colocamos la primera pieza
                 pieza_0_index, rotacion_0 = current_solution[0]
                 pieza_0 = self.pieces[pieza_0_index]
                 img_0 = cv.cvtColor(cv.imread(pieza_0.front_img_path), cv.COLOR_BGR2RGB)
                 mask_0 = cv.imread(f"{path_masks}/{pieza_0_index:02d}.png", cv.IMREAD_GRAYSCALE)
                 
+                # Flip horizontal para alinear con BACK, luego rotar
                 img_0_flipped = cv.flip(img_0, 1)
                 mask_0_flipped = cv.flip(mask_0, 1)
                 
@@ -613,6 +616,7 @@ class Backtrack_solver():
                     canvas[offset_y:offset_y+h0, offset_x:offset_x+w0], roi_0
                 )
                 
+                # Las esquinas se rotan igual que en plot_t_2 (sin flip) porque la imagen ya fue flipeada
                 corners_0_rot = get_all_corners_rotated(pieza_0, rotacion_0, img_0.shape)
                 corners_0_canvas = [c + np.array([offset_x, offset_y]) for c in corners_0_rot]
                 
@@ -623,6 +627,7 @@ class Backtrack_solver():
                     'corners_canvas': corners_0_canvas
                 }
 
+                # Mismo mapping que plot_t_2
                 direction_to_edges = {
                     (0, -1): (1, 3),
                     (0, 1): (3, 1),
@@ -638,6 +643,7 @@ class Backtrack_solver():
                     img = cv.cvtColor(cv.imread(pieza.front_img_path), cv.COLOR_BGR2RGB)
                     mask = cv.imread(f"{path_masks}/{pieza_index:02d}.png", cv.IMREAD_GRAYSCALE)
                     
+                    # Flip horizontal para alinear con BACK, luego rotar
                     img_flipped = cv.flip(img, 1)
                     mask_flipped = cv.flip(mask, 1)
                     
@@ -726,6 +732,17 @@ class Backtrack_solver():
                 plot_t_3()
 
 
+            c1 = 0.25
+            n_samples = 30
+            greedy = True
+            edge_threshold = 9
+            interior_threshold = 16
+
+            #c1 = 2
+            #n_samples = 20
+            #greedy = False
+            #edge_threshold = 9
+            #interior_threshold = 16
             
             # Tamao de borde 5x5
             if len(current_solution) < 16:
@@ -775,16 +792,6 @@ class Backtrack_solver():
                             (current_solution[-1][1] + first_edge_id) % 4
                         ], c1=c1, n_samples=n_samples, plot=False
                     )
-                
-                # Filtrar candidatos con kinds incompatibles (disimilaridad infinita)
-                pares_pieza_arista_candidatos = [
-                    (pid, eid) for pid, eid in pares_pieza_arista_candidatos
-                    if dissimilarity_key(pid, eid) < np.inf
-                ]
-                
-                # Si no quedan candidatos válidos, backtrack
-                if len(pares_pieza_arista_candidatos) == 0:
-                    return None
                 
                 pares_pieza_arista_candidatos = sorted(
                     pares_pieza_arista_candidatos,
@@ -864,7 +871,6 @@ class Backtrack_solver():
 
                 
                 # Funcion que calcula la disimilaridad total con TODOS los vecinos resueltos
-                # Retorna np.inf si alguna arista tiene kind incompatible con su vecino
                 def dissimilarity_key_interior(id_pieza, rotacion_candidato):
                     total_dissimilarity = 0
                     
@@ -887,20 +893,9 @@ class Backtrack_solver():
                             self.pieces[vecino_pieza_idx].edges[arista_vecino],
                             c1=c1, n_samples=n_samples, plot=False
                         )
-                        
-                        # Si hay incompatibilidad de kinds, retornar infinito inmediatamente
-                        if dissim == np.inf:
-                            return np.inf
-                        
                         total_dissimilarity += dissim
                     
                     return total_dissimilarity
-                
-                # Filtrar candidatos con kinds incompatibles (disimilaridad infinita)
-                pares_pieza_arista_candidatos = [
-                    (pid, rot) for pid, rot in pares_pieza_arista_candidatos
-                    if dissimilarity_key_interior(pid, rot) < np.inf
-                ]
                 
                 pares_pieza_arista_candidatos = sorted(
                     pares_pieza_arista_candidatos,

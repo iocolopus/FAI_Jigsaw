@@ -726,6 +726,12 @@ class Backtrack_solver():
                 plot_t_3()
 
 
+
+            #c1 = 2
+            #n_samples = 20
+            #greedy = False
+            #edge_threshold = 9
+            #interior_threshold = 16
             
             # Tamao de borde 5x5
             if len(current_solution) < 16:
@@ -775,16 +781,6 @@ class Backtrack_solver():
                             (current_solution[-1][1] + first_edge_id) % 4
                         ], c1=c1, n_samples=n_samples, plot=False
                     )
-                
-                # Filtrar candidatos con kinds incompatibles (disimilaridad infinita)
-                pares_pieza_arista_candidatos = [
-                    (pid, eid) for pid, eid in pares_pieza_arista_candidatos
-                    if dissimilarity_key(pid, eid) < np.inf
-                ]
-                
-                # Si no quedan candidatos válidos, backtrack
-                if len(pares_pieza_arista_candidatos) == 0:
-                    return None
                 
                 pares_pieza_arista_candidatos = sorted(
                     pares_pieza_arista_candidatos,
@@ -864,7 +860,6 @@ class Backtrack_solver():
 
                 
                 # Funcion que calcula la disimilaridad total con TODOS los vecinos resueltos
-                # Retorna np.inf si alguna arista tiene kind incompatible con su vecino
                 def dissimilarity_key_interior(id_pieza, rotacion_candidato):
                     total_dissimilarity = 0
                     
@@ -887,20 +882,9 @@ class Backtrack_solver():
                             self.pieces[vecino_pieza_idx].edges[arista_vecino],
                             c1=c1, n_samples=n_samples, plot=False
                         )
-                        
-                        # Si hay incompatibilidad de kinds, retornar infinito inmediatamente
-                        if dissim == np.inf:
-                            return np.inf
-                        
                         total_dissimilarity += dissim
                     
                     return total_dissimilarity
-                
-                # Filtrar candidatos con kinds incompatibles (disimilaridad infinita)
-                pares_pieza_arista_candidatos = [
-                    (pid, rot) for pid, rot in pares_pieza_arista_candidatos
-                    if dissimilarity_key_interior(pid, rot) < np.inf
-                ]
                 
                 pares_pieza_arista_candidatos = sorted(
                     pares_pieza_arista_candidatos,

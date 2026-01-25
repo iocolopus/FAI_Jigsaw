@@ -287,8 +287,7 @@ class Backtrack_solver():
     def __init__(self, pieces = [Piece]):
         self.pieces = pieces
 
-    def solve(self, plot_for_ipynb_t_1=False, plot_for_ipynb_t_2=False, plot_for_ipynb_t_3=False, c1=0, n_samples=50, greedy=True, edge_threshold=9, interior_threshold=16):
-
+    def solve(self, plot_for_ipynb_t_1=False, plot_for_ipynb_t_2=False, plot_for_ipynb_t_3=False):
 
 
         def generate_spiral_index(n, m):
@@ -638,6 +637,7 @@ class Backtrack_solver():
                     img = cv.cvtColor(cv.imread(pieza.front_img_path), cv.COLOR_BGR2RGB)
                     mask = cv.imread(f"{path_masks}/{pieza_index:02d}.png", cv.IMREAD_GRAYSCALE)
                     
+                    # Flip horizontal para alinear con BACK, luego rotar
                     img_flipped = cv.flip(img, 1)
                     mask_flipped = cv.flip(mask, 1)
                     
@@ -726,6 +726,17 @@ class Backtrack_solver():
                 plot_t_3()
 
 
+            c1 = 0.25
+            n_samples = 30
+            greedy = True
+            edge_threshold = 9
+            interior_threshold = 16
+
+            #c1 = 2
+            #n_samples = 20
+            #greedy = False
+            #edge_threshold = 9
+            #interior_threshold = 16
             
             # Tamao de borde 5x5
             if len(current_solution) < 16:
@@ -775,16 +786,6 @@ class Backtrack_solver():
                             (current_solution[-1][1] + first_edge_id) % 4
                         ], c1=c1, n_samples=n_samples, plot=False
                     )
-                
-                # Filtrar candidatos con kinds incompatibles (disimilaridad infinita)
-                pares_pieza_arista_candidatos = [
-                    (pid, eid) for pid, eid in pares_pieza_arista_candidatos
-                    if dissimilarity_key(pid, eid) < np.inf
-                ]
-                
-                # Si no quedan candidatos válidos, backtrack
-                if len(pares_pieza_arista_candidatos) == 0:
-                    return None
                 
                 pares_pieza_arista_candidatos = sorted(
                     pares_pieza_arista_candidatos,
@@ -864,7 +865,6 @@ class Backtrack_solver():
 
                 
                 # Funcion que calcula la disimilaridad total con TODOS los vecinos resueltos
-                # Retorna np.inf si alguna arista tiene kind incompatible con su vecino
                 def dissimilarity_key_interior(id_pieza, rotacion_candidato):
                     total_dissimilarity = 0
                     
@@ -887,20 +887,9 @@ class Backtrack_solver():
                             self.pieces[vecino_pieza_idx].edges[arista_vecino],
                             c1=c1, n_samples=n_samples, plot=False
                         )
-                        
-                        # Si hay incompatibilidad de kinds, retornar infinito inmediatamente
-                        if dissim == np.inf:
-                            return np.inf
-                        
                         total_dissimilarity += dissim
                     
                     return total_dissimilarity
-                
-                # Filtrar candidatos con kinds incompatibles (disimilaridad infinita)
-                pares_pieza_arista_candidatos = [
-                    (pid, rot) for pid, rot in pares_pieza_arista_candidatos
-                    if dissimilarity_key_interior(pid, rot) < np.inf
-                ]
                 
                 pares_pieza_arista_candidatos = sorted(
                     pares_pieza_arista_candidatos,
