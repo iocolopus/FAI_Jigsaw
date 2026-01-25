@@ -152,13 +152,13 @@ class Edge():
     
     def resample_contour_uniform(self, n_samples=50, plot=False):
         """
-        Remuestra el contorno de la arista de forma uniforme usando splines cúbicos parametrizados por longitud de arco.
+        Remuestra el contorno de la arista de forma uniforme usando splines parametrizados por longitud de arco.
         
         Args:
-            n_samples: Número de puntos a generar (default 200)
+            n_samples: Número de puntos a generar (default 50)
             
         Returns:
-            Tuple de (x_resampled, y_resampled) con n_samples puntos cada uno, uniformemente distribuidos en longitud de arco.
+            Tuple de (x_resampled, y_resampled)
         """
         contour = self.straighten_contour.astype(np.float32)
         
@@ -171,15 +171,14 @@ class Edge():
         x_orig = contour[:, 0]
         y_orig = contour[:, 1]
         
-        # Crear splines cúbicos parametrizados por longitud de arco
-        # s es el parámetro (longitud de arco), x(s) e y(s) son funciones suaves
+        # Crear splines parametrizados por longitud de arco
         spline_x = interp1d(arc_lengths, x_orig, kind='linear')
         spline_y = interp1d(arc_lengths, y_orig, kind='linear')
         
         # Generar n_samples puntos uniformemente distribuidos en la longitud de arco
         s_resampled = np.linspace(0, arc_lengths[-1], n_samples)
         
-        # Evaluar los splines en los nuevos puntos de parámetro
+        # Evaluar los splines
         x_resampled = spline_x(s_resampled)
         y_resampled = spline_y(s_resampled)
 
@@ -191,12 +190,12 @@ class Edge():
             plt.show()
         
         return x_resampled, y_resampled
-    
+
     def dissimilarity(self, other : Piece, c1 = 0, n_samples=50, plot=False):
         # c1: regula la importancia que se le da en la disimilaridad la diferencia de longitudes entre aristas
         """
         Calcula una medida de disimilitud entre esta arista y otra.
-        Utiliza remuestreo uniforme y suma de diferencias cuadráticas.
+        Alinea desde (0,0) y hace ajuste fino para minimizar la distancia.
         
         Args:
             other: Otra instancia de Edge para comparar.
@@ -212,6 +211,36 @@ class Edge():
         x1, y1 = self.resample_contour_uniform(n_samples=n_samples)
         x2, y2 = other.resample_contour_uniform(n_samples=n_samples)
         
+        # Alinear ambos contornos desde (0, 0) - el primer punto en el origen
+        x1 = x1 - x1[0]
+        y1 = y1 - y1[0]
+        x2 = x2 - x2[0]
+        y2 = y2 - y2[0]
+        
+        # Ajuste fino: buscar la traslación (tx, ty) que minimiza el error
+        best_error = np.inf
+        best_tx, best_ty = 0, 0
+        
+        # Búsqueda en un rango amplio
+        for tx in np.arange(-20, 20.5, 1):
+            for ty in np.arange(-20, 20.5, 1):
+                error = np.sum((x1 - (x2 + tx)) ** 2 + (y1 - (y2 + ty)) ** 2)
+                if error < best_error:
+                    best_error = error
+                    best_tx, best_ty = tx, ty
+        
+        # Refinamiento fino
+        for tx in np.arange(best_tx - 1, best_tx + 1.1, 0.1):
+            for ty in np.arange(best_ty - 1, best_ty + 1.1, 0.1):
+                error = np.sum((x1 - (x2 + tx)) ** 2 + (y1 - (y2 + ty)) ** 2)
+                if error < best_error:
+                    best_error = error
+                    best_tx, best_ty = tx, ty
+        
+        # Aplicar la mejor traslación
+        x2 = x2 + best_tx
+        y2 = y2 + best_ty
+        
         # Calcular disimilitud como suma de diferencias cuadráticas
         mean_root_square_error = (np.sum((x1 - x2) ** 2 + (y1 - y2) ** 2) / n_samples) ** 0.5
         length_difference = self.abs_len_diff(other)
@@ -220,17 +249,17 @@ class Edge():
 
 
         if plot:
-            plt.plot(x1, y1, 'o-', label='Arista 1')
-            plt.plot(x2, y2, 'o-', label='Arista 2')
-            plt.title(f'Dissimilarity: {dissimilarity_value:.2f}')
+            plt.plot(x1, y1, 'o-', label='Arista 1', linewidth=2)
+            plt.plot(x2, y2, 'o-', label='Arista 2', linewidth=2)
+            plt.title(f'Dissimilarity: {dissimilarity_value:.2f} (tx={best_tx:.1f}, ty={best_ty:.1f})')
             plt.axis('equal')
             plt.legend()
             plt.show()
 
-        # ploteamos un segmenteo de recta entre cada par de puntos para ver mejor la diferencia
+        # ploteamos un segmento de recta entre cada par de puntos para ver mejor la diferencia
         if plot:
             for i in range(n_samples):
-                plt.plot([x1[i], x2[i]], [y1[i], y2[i]], 'r-')
+                plt.plot([x1[i], x2[i]], [y1[i], y2[i]], 'r-', alpha=0.3)
             plt.title('Diferencias entre puntos remuestreados')
             plt.axis('equal')
             plt.show()
@@ -308,8 +337,32 @@ class Backtrack_solver():
 
         def r_solve(current_solution):
 
+            def plot_current_solution():
+                fig, ax = plt.subplots(5, 5, figsize=(10, 10))
+                ax = ax.flatten()
+
+                for idx, (pieza_index, rotacion) in enumerate(current_solution):
+                    pieza = self.pieces[pieza_index]
+                    img = cv.cvtColor(cv.imread(pieza.back_img_path), cv.COLOR_BGR2RGB)
+
+                    # Rotar la imagen según la rotación de la pieza
+                    img_rotated = np.rot90(img, k=rotacion)
+
+                    plt.sca(ax[idx])
+                    plt.imshow(img_rotated)
+                    plt.axis('off')
+
+                plt.show()
+
+            plot_current_solution()
+
+
+
             c1 = 0.25
-            n_samples = 50
+            n_samples = 30
+            greedy = True
+            edge_threshold = 9
+            interior_threshold = 16
             
             # Tamao de borde 5x5
             if len(current_solution) < 16:
@@ -373,8 +426,9 @@ class Backtrack_solver():
                     self.pieces[pares_pieza_arista_candidatos[0][0]].edges[
                         pares_pieza_arista_candidatos[0][1]
                     ], c1=c1, n_samples=n_samples, plot=False
-                ) > 12:
-                    return None  # Backtrack si no hay buen candidato
+                ) > edge_threshold:
+                    if not greedy:
+                        return None
 
                 for pieza_index, edge_id in pares_pieza_arista_candidatos:
                     # probamos a añadir la pieza a la solucion
@@ -479,9 +533,10 @@ class Backtrack_solver():
                 )
                 
                 # Umbral ajustado: consideramos que hay más vecinos, así que el umbral total es mayor
-                umbral_por_vecino = 8
+                umbral_por_vecino = interior_threshold
                 if best_dissimilarity > umbral_por_vecino * len(vecinos_resueltos):
-                    return None  # Backtrack si no hay buen candidato
+                    if not greedy:  # Backtrack si no hay buen candidato
+                        return None
 
                 for pieza_index, rotacion in pares_pieza_arista_candidatos:
                     # Añadimos la pieza con su rotación directamente
